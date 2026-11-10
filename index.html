@@ -29,7 +29,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   background:radial-gradient(120% 70% at 50% 0%,#1d2d50 0%,#0c1426 55%,#070b14 100%)}
 @media (min-width:900px){
   .side{display:block;max-width:340px}
-  .phone{width:390px;height:844px;border-radius:54px;
+  .phone{width:390px;height:min(844px,calc(100vh - 32px));border-radius:54px;
     box-shadow:0 0 0 11px #121826,0 0 0 12px #2b3548,0 40px 120px rgba(0,0,0,.65)}
 }
 
@@ -287,6 +287,8 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   function mmss(sec) { sec = Math.max(0, Math.floor(sec)); return pad(Math.floor(sec / 60)) + ':' + pad(sec % 60); }
   function digits(s) { return String(s || '').replace(/\D/g, ''); }
   function last4(s) { var d = digits(s); return d.slice(-4); }
+  var WORDS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+  function last4Words(s) { return last4(s).split('').map(function (c) { return WORDS[+c]; }).join(' '); }
   function prettyPhone(s) {
     var d = digits(s);
     if (d.length === 10) return d.slice(0, 4) + ' ' + d.slice(4, 7) + ' ' + d.slice(7);
@@ -488,7 +490,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     var v = VOICES[S.voice];
     var opts = {
       agentId: AGENT_ID,
-      dynamicVariables: { customer_phone: S.phone, ten_tro_ly: v.name, vung_mien: v.vung },
+      dynamicVariables: { customer_phone: S.phone, so_cuoi: last4Words(S.phone), ten_tro_ly: v.name, vung_mien: v.vung },
       clientTools: tools,
       onConnect: function () {
         S.connectedAt = Date.now(); $('call').classList.remove('calling');
