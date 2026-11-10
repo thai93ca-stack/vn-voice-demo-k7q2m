@@ -460,10 +460,16 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     var v = String(p.van_phong || '');
     return 'Địa điểm: ' + (OFFICES[v] || (v && v !== 'Không áp dụng' ? v : 'Văn phòng StudyLink'));
   }
+  var THU = { hai: 'Hai', ba: 'Ba', tu: 'Tư', nam: 'Năm', sau: 'Sáu', bay: 'Bảy' };
+  function fixTime(t) {
+    return String(t || '').replace(/\bthu (hai|ba|tu|nam|sau|bay)\b/gi, function (_, d) { return 'Thứ ' + THU[d.toLowerCase()]; })
+      .replace(/\bchu nhat\b/gi, 'Chủ nhật');
+  }
   function bookingSms(p, code) {
     var topic = String(p.chu_de || '').trim();
+    if (topic.length > 12 && !/[à-ỹđ]/i.test(topic)) topic = '';   // drop a topic written without diacritics
     return 'StudyLink: Xác nhận lịch tư vấn miễn phí' + (topic ? ' – ' + topic : '') + '.\n' +
-      'Thời gian: ' + (p.thoi_gian || '') + '\n' + placeLine(p) + '\n' +
+      'Thời gian: ' + fixTime(p.thoi_gian) + '\n' + placeLine(p) + '\n' +
       'Mã lịch hẹn: ' + code + '\nHotline 0911 71 44 88';
   }
   function deliverSms(body, loai) {
@@ -473,6 +479,12 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     return m;
   }
   var bookedAt = 0;
+  // the LLM sometimes writes SMS without Vietnamese diacritics — bounce those back so it resends properly
+  function lacksDiacritics(t) {
+    var letters = (t.match(/[a-zà-ỹđ]/gi) || []).length;
+    var marks = (t.match(/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/gi) || []).length;
+    return letters > 40 && marks / letters < 0.04;
+  }
 
   var tools = {
     cap_nhat_ho_so: function () { return 'Đã cập nhật hồ sơ'; },
@@ -494,11 +506,15 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     },
     gui_sms: async function (p) {
       p = p || {};
+      var body = String(p.noi_dung || '').trim();
+      if (lacksDiacritics(body)) {
+        return JSON.stringify({ trang_thai: 'CHƯA GỬI: nội dung đang viết không dấu. Gọi lại gui_sms ngay với cùng nội dung nhưng viết tiếng Việt CÓ DẤU đầy đủ, chưa cần nói gì với khách.' });
+      }
       await sleep(900);
       if (/xác nhận/i.test(String(p.loai || '')) && bookedAt && Date.now() - bookedAt < 25000) {
         return JSON.stringify({ trang_thai: 'Tin nhắn xác nhận lịch hẹn vừa được gửi tự động rồi, không gửi trùng.' });
       }
-      deliverSms(String(p.noi_dung || '').trim() || 'StudyLink: (tin nhắn trống)', p.loai);
+      deliverSms(body || 'StudyLink: (tin nhắn trống)', p.loai);
       return JSON.stringify({ trang_thai: 'Đã gửi thành công', gui_toi: 'số đuôi ' + last4Words(S.phone), luc: hhmm(new Date()) });
     }
   };
