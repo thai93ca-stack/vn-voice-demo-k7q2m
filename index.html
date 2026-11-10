@@ -33,7 +33,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     box-shadow:0 0 0 11px #121826,0 0 0 12px #2b3548,0 40px 120px rgba(0,0,0,.65)}
 }
 
-.screen{position:absolute;inset:0;display:flex;flex-direction:column;
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;
   padding:calc(env(safe-area-inset-top) + 18px) 22px calc(env(safe-area-inset-bottom) + 22px);
   transition:opacity .3s ease,transform .3s ease}
 .screen.off{opacity:0;pointer-events:none;transform:scale(.985)}
@@ -73,12 +73,13 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 .call-top{text-align:center;margin-top:34px}
 .call-name{font-size:30px;font-weight:600}
 .call-status{margin-top:8px;color:var(--muted);font-size:16px;font-variant-numeric:tabular-nums}
-.orb-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:0}
-.orb{width:132px;height:132px;border-radius:50%;display:grid;place-items:center;font-size:40px;font-weight:700;letter-spacing:1px;
+.orb-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:0;container-type:size}
+.orb{flex-shrink:0;width:132px;height:132px;border-radius:50%;display:grid;place-items:center;font-size:40px;font-weight:700;letter-spacing:1px;
   background:linear-gradient(140deg,#2dd4bf 0%,#3b82f6 60%,#6366f1 100%);position:relative;will-change:transform;
   box-shadow:0 0 0 0 rgba(45,212,191,.0)}
 .orb::after{content:"";position:absolute;inset:-14px;border-radius:50%;border:2px solid rgba(45,212,191,.35);opacity:0;transition:opacity .3s}
 .orb.talk::after{opacity:1}
+@supports (container-type:size){.orb{width:min(132px,50cqh);height:min(132px,50cqh);font-size:min(40px,15cqh)}}
 .calling .orb{animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.45)}50%{box-shadow:0 0 0 22px rgba(59,130,246,0)}}
 .who{font-size:14px;color:var(--muted);min-height:20px}
@@ -102,7 +103,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 /* ended */
 .ended-box{margin-top:60px;text-align:center}
 .ended-box h2{margin:0;font-size:24px;font-weight:600}
-.end-sms{margin:28px 4px 0;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.5;text-align:left}
+.end-sms{white-space:pre-line;margin:28px 4px 0;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.5;text-align:left}
 .end-sms small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
 .end-actions{margin-top:auto;display:grid;gap:10px}
 .btn-primary{background:var(--green);color:#fff;font-weight:600;font-size:16px;border-radius:14px;padding:15px}
@@ -138,6 +139,34 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
 .chip{font-size:13px;font-weight:600;color:#04211d;background:rgba(45,212,191,.95);padding:8px 14px;border-radius:999px;opacity:0;transform:translateY(6px);transition:all .3s;max-width:92%;text-align:center;min-height:0}
 .chip:empty{padding:0}
 .chip.show{opacity:1;transform:none}
+
+.screen::-webkit-scrollbar{display:none}
+/* short screens: phones with browser bars, small laptops */
+@media (max-height:760px){
+  .contact{margin-top:14px}
+  .avatar{width:76px;height:76px;font-size:26px;margin-bottom:10px}
+  .contact h1{font-size:25px}
+  .ai-badge{margin-top:8px}
+  .card{margin-top:18px;padding:14px}
+  .card .label{margin-top:12px}
+  .hint{margin-top:6px}
+  .callwrap{padding-top:14px}
+  .btn-call{width:70px;height:70px}
+  .foot{margin-top:12px}
+  .call-top{margin-top:14px}
+  .call-name{font-size:27px}
+  .controls{margin:4px 8px 18px}
+  .ctl .ic{width:60px;height:60px}
+  .btn-end{width:70px;height:70px}
+  .captions{max-height:100px}
+  .ended-box{margin-top:30px}
+}
+@media (max-height:620px){
+  .hint,.foot{display:none}
+  .avatar{width:60px;height:60px;font-size:22px}
+  .contact h1{font-size:22px}
+  .sub{font-size:13px}
+}
 
 /* side */
 .kicker{font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent)}
@@ -380,7 +409,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   }
   var bannerTimer = null;
   function showBanner(m) {
-    $('bBody').textContent = m.body;
+    $('bBody').textContent = m.body.replace(/\.?\s*\n+\s*/g, '. ');
     $('banner').classList.add('show');
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(function () { $('banner').classList.remove('show'); }, 7000);
@@ -415,26 +444,62 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
   }
 
   // ---------- client tools (called by the AI during the call) ----------
+  var OFFICES = {
+    'TP.HCM - Sunwah Tower, 115 Nguyễn Huệ': 'Tầng M, Sunwah Tower, 115 Nguyễn Huệ, P. Sài Gòn, TP.HCM',
+    'TP.HCM - 449/9 Sư Vạn Hạnh': '449/9 Sư Vạn Hạnh, P. Hòa Hưng, TP.HCM',
+    'Hà Nội - Mipec Tower, 229 Tây Sơn': 'Tầng 12 Bishub, Mipec Tower, 229 Tây Sơn, Hà Nội',
+    'Đà Nẵng - Tòa nhà PV Bank, 2 đường 30/4': 'Tầng 6, tòa nhà PV Bank, 2 đường 30/4, Đà Nẵng',
+    'Melbourne': 'Level 1, 530 Little Collins Street, Melbourne',
+    'Toronto': '18 King Street East, Suite 1400, Toronto',
+    'Calgary': '211 13th Avenue SE, Calgary'
+  };
+  function placeLine(p) {
+    var hinh = String(p.hinh_thuc || '');
+    if (/zoom|online/i.test(hinh)) return 'Hình thức: Online qua Zoom (link gửi trước buổi hẹn)';
+    if (/gọi/i.test(hinh)) return 'Hình thức: Chuyên viên gọi tới số đuôi ' + last4(S.phone);
+    var v = String(p.van_phong || '');
+    return 'Địa điểm: ' + (OFFICES[v] || (v && v !== 'Không áp dụng' ? v : 'Văn phòng StudyLink'));
+  }
+  function bookingSms(p, code) {
+    var topic = String(p.chu_de || '').trim();
+    return 'StudyLink: Xác nhận lịch tư vấn miễn phí' + (topic ? ' – ' + topic : '') + '.\n' +
+      'Thời gian: ' + (p.thoi_gian || '') + '\n' + placeLine(p) + '\n' +
+      'Mã lịch hẹn: ' + code + '\nHotline 0911 71 44 88';
+  }
+  function deliverSms(body, loai) {
+    var m = { id: Date.now(), body: body, loai: loai || '', to: S.phone, at: Date.now() };
+    addSms(m); showBanner(m); ping();
+    try { if (navigator.vibrate) navigator.vibrate([70, 50, 70]); } catch (e) {}
+    return m;
+  }
+  var bookedAt = 0;
+
   var tools = {
     cap_nhat_ho_so: function () { return 'Đã cập nhật hồ sơ'; },
     dat_lich_tu_van: async function (p) {
       p = p || {};
       await sleep(900);
       var code = 'SL' + String(Math.floor(1000 + Math.random() * 9000));
+      var sms = bookingSms(p, code);
       toast('Đã giữ lịch · ' + (p.thoi_gian || ''));
+      bookedAt = Date.now();
+      setTimeout(function () { deliverSms(sms, 'Xác nhận lịch hẹn'); }, 1800);   // arrives while she reads it back
       return JSON.stringify({
         trang_thai: 'Đã giữ lịch thành công', ma_lich_hen: code,
         thoi_gian: p.thoi_gian || '', hinh_thuc: p.hinh_thuc || '', dia_diem: p.van_phong || '',
+        sms_xac_nhan: 'Hệ thống đã tự gửi SMS xác nhận tới số đuôi ' + last4Words(S.phone) + ', không cần gọi gui_sms.',
+        noi_dung_sms: sms,
         ghi_chu: 'Chuyên viên sẽ gọi xác nhận trước buổi hẹn một ngày'
       });
     },
     gui_sms: async function (p) {
       p = p || {};
-      await sleep(1100);
-      var m = { id: Date.now(), body: String(p.noi_dung || '').trim() || 'StudyLink: (tin nhắn trống)', loai: p.loai || '', to: S.phone, at: Date.now() };
-      addSms(m); showBanner(m); ping();
-      try { if (navigator.vibrate) navigator.vibrate([70, 50, 70]); } catch (e) {}
-      return JSON.stringify({ trang_thai: 'Đã gửi thành công', gui_toi: 'số đuôi ' + last4(S.phone), luc: hhmm(new Date()) });
+      await sleep(900);
+      if (/xác nhận/i.test(String(p.loai || '')) && bookedAt && Date.now() - bookedAt < 25000) {
+        return JSON.stringify({ trang_thai: 'Tin nhắn xác nhận lịch hẹn vừa được gửi tự động rồi, không gửi trùng.' });
+      }
+      deliverSms(String(p.noi_dung || '').trim() || 'StudyLink: (tin nhắn trống)', p.loai);
+      return JSON.stringify({ trang_thai: 'Đã gửi thành công', gui_toi: 'số đuôi ' + last4Words(S.phone), luc: hhmm(new Date()) });
     }
   };
 
@@ -477,7 +542,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
       fail(new Error('Chưa tải được thư viện thoại, hãy tải lại trang.')); return;
     }
     ensureFx();                                   // unlock audio inside the tap
-    S.starting = true; S.ended = false; S.connectedAt = 0; S.callSms = []; S.endReason = ''; lines = [];
+    S.starting = true; S.ended = false; S.connectedAt = 0; S.callSms = []; S.endReason = ''; lines = []; bookedAt = 0;
     $('captions').innerHTML = ''; $('homeErr').classList.add('hidden');
     S.phone = prettyPhone($('phone').value) || '0909 123 456'; $('phone').value = S.phone; store.set('sl_phone', S.phone);
     S.muted = false; $('muteBtn').classList.remove('on');
