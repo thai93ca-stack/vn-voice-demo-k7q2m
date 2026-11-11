@@ -293,6 +293,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
            first: 'Alô, StudyLink xin nghe ạ. Em là Linh, trợ lý AI của StudyLink... Vâng, anh chị cần em hỗ trợ gì ạ?' }
   };
   var TEXT_MODE = /[?&]text=1\b/.test(location.search);
+  var RTC = /[?&]rtc=1\b/.test(location.search);   // voice goes over websocket: the agent's domain lock only admits that path
 
   var $ = function (id) { return document.getElementById(id); };
   var store = {
@@ -305,7 +306,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     phone: store.get('sl_phone', '0909 123 456'),
     sms: store.get('sl_sms', []),
     unread: 0, conv: null, starting: false, connectedAt: 0, timer: null,
-    muted: false, cc: store.get('sl_cc', false), callSms: [], ended: true, endReason: ''
+    muted: false, cc: store.get('sl_cc', false), callSms: [], ended: true, endReason: '', agentSpoke: false
   };
   if (!VOICES[S.voice]) S.voice = 'nam';
 
@@ -558,7 +559,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
       fail(new Error('Chưa tải được thư viện thoại, hãy tải lại trang.')); return;
     }
     ensureFx();                                   // unlock audio inside the tap
-    S.starting = true; S.ended = false; S.connectedAt = 0; S.callSms = []; S.endReason = ''; lines = []; bookedAt = 0;
+    S.starting = true; S.ended = false; S.connectedAt = 0; S.callSms = []; S.endReason = ''; S.agentSpoke = false; lines = []; bookedAt = 0;
     $('captions').innerHTML = ''; $('homeErr').classList.add('hidden');
     S.phone = prettyPhone($('phone').value) || '0909 123 456'; $('phone').value = S.phone; store.set('sl_phone', S.phone);
     S.muted = false; $('muteBtn').classList.remove('on');
@@ -584,7 +585,7 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
       },
       onMessage: function (m) {
         var role = m.role || (m.source === 'user' ? 'user' : 'agent');
-        if (role !== 'user') stopRingback();
+        if (role !== 'user') { stopRingback(); S.agentSpoke = true; }
         caption(role, m.message);
       },
       onDisconnect: function (d) { onEnded(d); },
@@ -593,13 +594,14 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     };
     if (v.voiceId) opts.overrides = { tts: { voiceId: v.voiceId }, agent: { firstMessage: v.first } };
     if (TEXT_MODE) opts.textOnly = true;
+    else opts.connectionType = RTC ? 'webrtc' : 'websocket';
 
     try {
       S.conv = await window.ElevenLabsClient.Conversation.startSession(opts);
     } catch (err) {
       var perm = /NotAllowed|Permission|denied|NotFound/i.test(((err && err.name) || '') + ' ' + ((err && err.message) || ''));
       if (!TEXT_MODE && !perm && !S.ended) {
-        try { opts.connectionType = 'websocket'; S.conv = await window.ElevenLabsClient.Conversation.startSession(opts); }
+        try { opts.connectionType = opts.connectionType === 'websocket' ? 'webrtc' : 'websocket'; S.conv = await window.ElevenLabsClient.Conversation.startSession(opts); }
         catch (err2) { fail(err2); }
       } else { fail(err); }
     } finally {
@@ -614,8 +616,14 @@ button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer
     S.ended = true; S.conv = null;
     $('orb').classList.remove('talk'); $('call').classList.remove('calling');
     var reason = d && d.reason;
-    $('endTitle').textContent = reason === 'error' ? 'Cuộc gọi bị gián đoạn' : 'Cuộc gọi đã kết thúc';
-    $('endInfo').textContent = 'StudyLink · ' + dur + (reason === 'agent' ? ' · Tổng đài viên kết thúc' : '');
+    var why = d && (d.message || (d.context && d.context.reason)) ? String(d.message || d.context.reason) : '';
+    if (!S.agentSpoke && reason !== 'user') {
+      $('endTitle').textContent = 'Không kết nối được tổng đài';
+      $('endInfo').textContent = 'Tổng đài chưa nhận cuộc gọi' + (why ? ' (' + why.slice(0, 120) + ')' : '') + '. Bấm Gọi lại để thử lần nữa.';
+    } else {
+      $('endTitle').textContent = reason === 'error' ? 'Cuộc gọi bị gián đoạn' : 'Cuộc gọi đã kết thúc';
+      $('endInfo').textContent = 'StudyLink · ' + dur + (reason === 'agent' ? ' · Tổng đài viên kết thúc' : '') + (reason === 'error' && why ? ' · ' + why.slice(0, 120) : '');
+    }
     if (S.callSms.length) {
       var m = S.callSms[S.callSms.length - 1];
       $('endSms').innerHTML = '<small>Tin nhắn vừa nhận · ' + hhmm(new Date(m.at)) + '</small>' + esc(m.body);
